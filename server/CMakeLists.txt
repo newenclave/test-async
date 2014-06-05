@@ -1,7 +1,7 @@
 
 aux_source_directory(. src_dir)
 
-set( exe_name test_async_erver )
+set( exe_name test_async_server )
 
 add_executable(${exe_name} ${src_dir})
 
