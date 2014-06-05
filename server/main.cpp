@@ -17,7 +17,7 @@ std::set<stream_sptr> connections;
 
 void start_accept( ba::ip::tcp::acceptor &accept );
 
-class my_transformer: public async_transport::write_transformer
+class my_transformer: public async_transport::message_transformer
 {
     const  std::string key_;
     size_t counter;

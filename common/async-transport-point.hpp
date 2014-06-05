@@ -14,11 +14,12 @@
 
 namespace async_transport {
 
-    struct write_transformer {
+    struct message_transformer {
         virtual std::string transform( std::string &data ) = 0;
     };
 
-    struct write_transformer_none: public write_transformer {
+
+    struct write_transformer_none: public message_transformer {
         std::string transform( std::string &data )
         {
             return data;
@@ -41,6 +42,7 @@ namespace async_transport {
         };
 
         typedef boost::shared_ptr<queue_container> queue_container_sptr;
+        typedef boost::shared_ptr<message_transformer> transformer_sptr;
 
         struct impl: public boost::enable_shared_from_this<impl> {
 
@@ -60,7 +62,7 @@ namespace async_transport {
 
             bool                              active_;
 
-            boost::scoped_ptr<write_transformer> transformer_;
+            transformer_sptr                  transformer_;
 
             impl( boost::asio::io_service &ios, size_t read_block_size )
                 :ios_(ios)
@@ -72,17 +74,17 @@ namespace async_transport {
                 ,transformer_(new write_transformer_none)
             { }
 
-            void set_transformer_impl( write_transformer *new_trans )
+            void set_transformer_impl( transformer_sptr transform )
             {
-                transformer_.reset(new_trans);
+                transformer_ = transform;
             }
 
-            void set_transformer( write_transformer *new_trans )
+            void set_transformer( transformer_sptr trans)
             {
                 write_dispatcher_.post(
                             boost::bind( &impl::set_transformer_impl,
                                          this->shared_from_this( ),
-                                         new_trans ));
+                                         trans ));
             }
 
             void close_impl(  )
@@ -295,9 +297,9 @@ namespace async_transport {
             impl_->close( );
         }
 
-        void set_transformer( write_transformer *new_trans )
+        void set_transformer( message_transformer *new_trans )
         {
-            impl_->set_transformer( new_trans );
+            impl_->set_transformer( transformer_sptr(new_trans) );
         }
 
     };
