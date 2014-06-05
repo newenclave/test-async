@@ -2,6 +2,7 @@
 #include "boost/asio.hpp"
 
 #include <queue>
+#include <set>
 
 #include "common/async-transport-point.hpp"
 
@@ -12,13 +13,25 @@ typedef ba::ip::tcp::socket stream_type;
 typedef async_transport::point_iface<stream_type> async_point_type;
 typedef async_point_type::shared_type stream_sptr;
 
-std::vector<stream_sptr> connections;
+std::set<stream_sptr> connections;
 
 void start_accept( ba::ip::tcp::acceptor &accept );
 
+void on_error( stream_sptr ptr, const boost::system::error_code &err )
+{
+    std::cout << "Read error at "
+              << ptr->stream( ).remote_endpoint( ) << ": "
+              << err.message( )
+              << "\n"
+              ;
+    ptr->close( );
+    connections.erase( ptr );
+    std::cout << "clients: " << connections.size( ) << "\n";
+}
+
 void on_client_read( stream_sptr ptr, const char *data, size_t lenght )
 {
-    std::cout << "Read " << lenght << "bytes from "
+    std::cout << "Read " << lenght << " bytes from "
               << ptr->stream( ).remote_endpoint( ) << "\n";
 
     std::string res( data, data + lenght );
@@ -31,8 +44,9 @@ void accept_handle( boost::system::error_code const &err,
                     ba::ip::tcp::acceptor &accept )
 {
     if( !err ) {
-        connections.push_back( stream );
+        connections.insert( stream );
         stream->on_read_connect( boost::bind( on_client_read, stream, _1, _2 ));
+        stream->on_read_error_connect( boost::bind( on_error, stream, _1 ));
         stream->start_read( );
         start_accept( accept );
         std::cout << "new point accepted: "

@@ -49,6 +49,8 @@ namespace async_transport {
 
             point_iface<stream_type>         *parent_;
 
+            bool                              active_;
+
             impl( boost::asio::io_service &ios, size_t read_block_size )
                 :ios_(ios)
                 ,write_dispatcher_(ios_)
@@ -56,6 +58,21 @@ namespace async_transport {
                 ,read_impl_(&impl::start_read_impl_wrap)
                 ,read_buffer_(read_block_size)
             { }
+
+            void close_impl(  )
+            {
+                if( active_ ) {
+                    active_ = false;
+                    stream_.close( );
+                }
+            }
+
+            void close(  )
+            {
+                write_dispatcher_.post(
+                            boost::bind( &impl::close_impl,
+                                         this->shared_from_this( ) ));
+            }
 
             /// ================ write ================ ///
             void async_write( const char *data, size_t length, size_t total )
@@ -242,6 +259,11 @@ namespace async_transport {
         void start_read( )
         {
             impl_->start_read( );
+        }
+
+        void close( )
+        {
+            impl_->close( );
         }
     };
 
