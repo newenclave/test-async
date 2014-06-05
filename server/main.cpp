@@ -3,36 +3,71 @@
 
 #include <queue>
 
-typedef std::pair<unsigned, std::string> queue_value;
+#include "common/async-transport-point.hpp"
 
-struct priority_compare: public std::binary_function<queue_value,
-                                                     queue_value, bool >
+namespace ba = boost::asio;
+
+typedef ba::ip::tcp::socket stream_type;
+
+typedef async_transport::point_iface<stream_type> async_point_type;
+typedef async_point_type::shared_type stream_sptr;
+
+std::vector<stream_sptr> connections;
+
+void start_accept( ba::ip::tcp::acceptor &accept );
+
+void accept_handle( boost::system::error_code const &err,
+                    stream_sptr stream,
+                    ba::ip::tcp::acceptor &accept )
 {
-    bool operator ( )( const queue_value& l, const queue_value& r ) const
-    {
-        return l.first < r.first;
+    if( !err ) {
+        connections.push_back( stream );
+        stream->start_read( );
+        start_accept( accept );
+        std::cout << "new point accepted: "
+                  << stream->stream( ).remote_endpoint( )
+                  << std::endl;
+    } else {
+        std::cout << "accept error\n";
     }
-};
+}
 
-int main( )
+void start_accept( ba::ip::tcp::acceptor &accept )
+{
+    stream_sptr new_point = async_point_type::create( accept.get_io_service( ));
+    accept.async_accept(
+                new_point->stream( ),
+                boost::bind( accept_handle, ba::placeholders::error,
+                             new_point, boost::ref( accept ) ) );
+}
+
+ba::ip::tcp::endpoint make_endpoint( const std::string &address,
+                                    unsigned short port )
+{
+    return ba::ip::tcp::endpoint(ba::ip::address::from_string(address), port);
+}
+
+
+int main( ) try
 {
 
-    std::priority_queue< queue_value,
-                         std::vector< queue_value >,
-                         priority_compare
-                       > q;
+    ba::io_service       ios;
+    ba::io_service::work wrk(ios);
 
-    q.push( std::make_pair( 1, "test1" ) );
-    q.push( std::make_pair( 10, "test10" ) );
-    q.push( std::make_pair( -1, "zest-1" ) );
-    q.push( std::make_pair( -1, "test-1" ) );
-    q.push( std::make_pair( 2, "test2" ) );
-    q.push( std::make_pair( 100, "test100" ) );
+    ba::ip::tcp::acceptor acceptor( ios, make_endpoint("127.0.0.1", 55555) );
 
-    std::cout << q.top( ).second << "\n";
+    start_accept( acceptor );
 
-    q.pop( );
+    while( 1 ) {
+        ios.run( );
+    }
 
     return 0;
+
+} catch( const std::exception &ex ) {
+
+    std::cout << "main error: " << ex.what( ) << "\n";
+    return 1;
+
 }
 
