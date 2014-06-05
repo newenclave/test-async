@@ -197,10 +197,7 @@ namespace async_transport {
         VTRC_DECLARE_SIGNAL( on_write_error,
                              void ( const boost::system::error_code & ) );
 
-
-
     public:
-
 
         point_iface( boost::asio::io_service &ios )
             :impl_(new impl(ios, 4096))
