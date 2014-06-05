@@ -52,6 +52,12 @@ namespace async_transport {
 
         VTRC_DECLARE_SIGNAL( on_read, void ( const char *, size_t ) );
 
+        VTRC_DECLARE_SIGNAL( on_read_error,
+                             void ( const boost::system::error_code & ) );
+
+        VTRC_DECLARE_SIGNAL( on_write_error,
+                             void ( const boost::system::error_code & ) );
+
     protected:
 
         point_iface( boost::asio::io_service &ios,
@@ -59,8 +65,8 @@ namespace async_transport {
             :ios_(ios)
             ,write_dispatcher_(ios_)
             ,stream_(ios_)
+            ,read_impl_(&this_type::start_read_impl_wrap)
             ,read_buffer_(read_block_size)
-            ,read_impl_(&this_type::start_read_impl)
         { }
 
 
@@ -77,17 +83,18 @@ namespace async_transport {
 
     private:
 
+        /// ================ write ================ ///
         void async_write( const char *data, size_t length, size_t total )
         {
             try {
-                stream_->async_write_some(
+                stream_.async_write_some(
                         boost::asio::buffer( data, length ),
                         write_dispatcher_.wrap(
                             boost::bind( &this_type::write_handler, this,
                                  boost::asio::placeholders::error,
                                  boost::asio::placeholders::bytes_transferred,
                                  length, total,
-                                 this->hared_from_this( )))
+                                 this->shared_from_this( )))
                         );
             } catch( const std::exception & ) {
                 ;;; /// generate error
@@ -126,6 +133,7 @@ namespace async_transport {
                         async_write(  );
                 }
             } else {
+                on_write_error_( error );
                 /// generate error
             }
 
@@ -142,6 +150,7 @@ namespace async_transport {
             }
         }
 
+        /// ================ read ================ ///
         void read_handler( const boost::system::error_code &error,
                            size_t const bytes, shared_type /*weak_inst*/ )
         {
@@ -149,8 +158,8 @@ namespace async_transport {
                 on_read_( &read_buffer_[0], bytes );
                 start_read( );
             } else {
-                std::cout << "Read error: " << error.message( ) << "\n";
                 /// genegate error;
+                on_read_error_( error );
             }
         }
 
@@ -210,16 +219,12 @@ namespace async_transport {
             inst->message_.assign( data, length );
             write_dispatcher_.post(
                         boost::bind( &this_type::write_impl, this,
-                                     0, inst, this->hared_from_this( ) ) );
+                                     0, inst, this->shared_from_this( ) ) );
         }
 
         void start_read( )
         {
-            try {
-                (this->*read_impl_)( );
-            } catch( const std::exception & /*ex*/ ) {
-                /// generate error
-            }
+            (this->*read_impl_)( );
         }
 
     };

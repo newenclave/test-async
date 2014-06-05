@@ -19,9 +19,11 @@ void start_accept( ba::ip::tcp::acceptor &accept );
 void on_client_read( stream_sptr ptr, const char *data, size_t lenght )
 {
     std::cout << "Read " << lenght << "bytes from "
-              << ptr->stream( ).remote_endpoint( )
-              << ": '"
-              << std::string( data, lenght ) << "'\n";
+              << ptr->stream( ).remote_endpoint( ) << "\n";
+
+    std::string res( data, data + lenght );
+    std::reverse( res.begin( ), res.end( ) );
+    ptr->write( res );
 }
 
 void accept_handle( boost::system::error_code const &err,
