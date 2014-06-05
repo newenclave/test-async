@@ -60,7 +60,10 @@ void on_client_read( stream_sptr ptr, const char *data, size_t lenght )
 
     std::string res( data, data + lenght );
     std::reverse( res.begin( ), res.end( ) );
+
     ptr->write( res );
+    ptr->write( std::string("->>"), 10 );
+
 }
 
 void accept_handle( boost::system::error_code const &err,
@@ -68,12 +71,14 @@ void accept_handle( boost::system::error_code const &err,
                     ba::ip::tcp::acceptor &accept )
 {
     if( !err ) {
+
         connections.insert( stream );
+
         stream->on_read_connect( boost::bind( on_client_read, stream, _1, _2 ));
         stream->on_read_error_connect( boost::bind( on_error, stream, _1 ));
         stream->start_read( );
 
-        stream->set_transformer( new my_transformer( "123789" ) );
+        //stream->set_transformer( new my_transformer( "123789" ) );
 
         start_accept( accept );
         std::cout << "new point accepted: "
