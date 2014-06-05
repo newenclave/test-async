@@ -16,12 +16,21 @@ std::vector<stream_sptr> connections;
 
 void start_accept( ba::ip::tcp::acceptor &accept );
 
+void on_client_read( stream_sptr ptr, const char *data, size_t lenght )
+{
+    std::cout << "Read " << lenght << "bytes from "
+              << ptr->stream( ).remote_endpoint( )
+              << ": '"
+              << std::string( data, lenght ) << "'\n";
+}
+
 void accept_handle( boost::system::error_code const &err,
                     stream_sptr stream,
                     ba::ip::tcp::acceptor &accept )
 {
     if( !err ) {
         connections.push_back( stream );
+        stream->on_read_connect( boost::bind( on_client_read, stream, _1, _2 ));
         stream->start_read( );
         start_accept( accept );
         std::cout << "new point accepted: "

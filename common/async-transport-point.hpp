@@ -10,6 +10,8 @@
 #include <deque>
 #include <string>
 
+#include "vtrc-signal-declaration.h"
+
 namespace async_transport {
 
     template <typename ST>
@@ -47,6 +49,8 @@ namespace async_transport {
 
         std::deque<queue_container_sptr>  write_queue_;
         std::vector<char>                 read_buffer_;
+
+        VTRC_DECLARE_SIGNAL( on_read, void ( const char *, size_t ) );
 
     protected:
 
@@ -142,11 +146,7 @@ namespace async_transport {
                            size_t const bytes, shared_type /*weak_inst*/ )
         {
             if( !error ) {
-                /// generate event
-                ///
-                std::cout << "Read " << bytes << ": "
-                          << std::string(read_buffer_.begin( ),
-                                         read_buffer_.begin( ) + bytes);
+                on_read_( &read_buffer_[0], bytes );
                 start_read( );
             } else {
                 std::cout << "Read error: " << error.message( ) << "\n";
@@ -201,8 +201,13 @@ namespace async_transport {
 
         void write( const std::string &data )
         {
+            write( data.c_str( ), data.size( ) );
+        }
+
+        void write( const char *data, size_t length )
+        {
             queue_container_sptr inst(boost::make_shared<queue_container>( ));
-            inst->message_.assign( data );
+            inst->message_.assign( data, length );
             write_dispatcher_.post(
                         boost::bind( &this_type::write_impl, this,
                                      0, inst, this->hared_from_this( ) ) );
@@ -210,7 +215,11 @@ namespace async_transport {
 
         void start_read( )
         {
-            (this->*read_impl_)( );
+            try {
+                (this->*read_impl_)( );
+            } catch( const std::exception & /*ex*/ ) {
+                /// generate error
+            }
         }
 
     };
