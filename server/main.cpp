@@ -17,6 +17,30 @@ std::set<stream_sptr> connections;
 
 void start_accept( ba::ip::tcp::acceptor &accept );
 
+class my_transformer: public async_transport::write_transformer
+{
+    const  std::string key_;
+    size_t counter;
+
+public:
+    my_transformer( const std::string &key )
+        :key_(key)
+        ,counter(0)
+    { }
+
+private:
+    std::string transform( std::string &data )
+    {
+        std::cout << "tramsform " << data.size( ) << " bytes of data\n";
+        for( size_t i=0; i<data.size( ); ++i ) {
+            ++counter;
+            counter %= key_.size( );
+            data[i] ^= key_[ counter ];
+        }
+        return data;
+    }
+};
+
 void on_error( stream_sptr ptr, const boost::system::error_code &err )
 {
     std::cout << "Read error at "
@@ -48,6 +72,9 @@ void accept_handle( boost::system::error_code const &err,
         stream->on_read_connect( boost::bind( on_client_read, stream, _1, _2 ));
         stream->on_read_error_connect( boost::bind( on_error, stream, _1 ));
         stream->start_read( );
+
+        stream->set_transformer( new my_transformer( "123789" ) );
+
         start_accept( accept );
         std::cout << "new point accepted: "
                   << stream->stream( ).remote_endpoint( )

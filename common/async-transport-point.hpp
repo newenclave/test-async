@@ -14,6 +14,17 @@
 
 namespace async_transport {
 
+    struct write_transformer {
+        virtual std::string transform( std::string &data ) = 0;
+    };
+
+    struct write_transformer_none: public write_transformer {
+        std::string transform( std::string &data )
+        {
+            return data;
+        }
+    };
+
     template <typename ST>
     class point_iface {
 
@@ -35,29 +46,44 @@ namespace async_transport {
 
             typedef ST stream_type;
             typedef boost::shared_ptr<impl> shared_type;
-
-            boost::asio::io_service         &ios_;
-            boost::asio::io_service::strand  write_dispatcher_;
-            stream_type                      stream_;
-
             typedef void ( impl::*read_impl )( );
 
-            read_impl                        read_impl_;
+            boost::asio::io_service          &ios_;
+            boost::asio::io_service::strand   write_dispatcher_;
+            stream_type                       stream_;
 
             std::deque<queue_container_sptr>  write_queue_;
             std::vector<char>                 read_buffer_;
+            read_impl                         read_impl_;
 
             point_iface<stream_type>         *parent_;
 
             bool                              active_;
 
+            boost::scoped_ptr<write_transformer> transformer_;
+
             impl( boost::asio::io_service &ios, size_t read_block_size )
                 :ios_(ios)
                 ,write_dispatcher_(ios_)
                 ,stream_(ios_)
-                ,read_impl_(&impl::start_read_impl_wrap)
                 ,read_buffer_(read_block_size)
+                ,read_impl_(&impl::start_read_impl_wrap)
+                ,active_(true)
+                ,transformer_(new write_transformer_none)
             { }
+
+            void set_transformer_impl( write_transformer *new_trans )
+            {
+                transformer_.reset(new_trans);
+            }
+
+            void set_transformer( write_transformer *new_trans )
+            {
+                write_dispatcher_.post(
+                            boost::bind( &impl::set_transformer_impl,
+                                         this->shared_from_this( ),
+                                         new_trans ));
+            }
 
             void close_impl(  )
             {
@@ -94,6 +120,9 @@ namespace async_transport {
 
             void async_write(  )
             {
+                std::string &top(write_queue_.front( )->message_);
+                top.assign(transformer_->transform( top ) );
+
                 async_write( write_queue_.front( )->message_.c_str( ),
                              write_queue_.front( )->message_.size( ), 0);
             }
@@ -265,6 +294,12 @@ namespace async_transport {
         {
             impl_->close( );
         }
+
+        void set_transformer( write_transformer *new_trans )
+        {
+            impl_->set_transformer( new_trans );
+        }
+
     };
 
 }
