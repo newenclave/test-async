@@ -4,6 +4,8 @@
 #include <queue>
 #include <set>
 
+#include "boost/thread.hpp"
+
 #include "common/async-transport-point.hpp"
 
 namespace ba = boost::asio;
@@ -53,6 +55,12 @@ void on_error( stream_sptr ptr, const boost::system::error_code &err )
     std::cout << "clients: " << connections.size( ) << "\n";
 }
 
+void write( stream_sptr ptr, std::string res )
+{
+    ptr->write( res );
+    ptr->write( std::string("]") );
+}
+
 void on_client_read( stream_sptr ptr, const char *data, size_t lenght )
 {
     std::cout << "Read " << lenght << " bytes from "
@@ -61,9 +69,8 @@ void on_client_read( stream_sptr ptr, const char *data, size_t lenght )
     std::string res( data, data + lenght );
     std::reverse( res.begin( ), res.end( ) );
 
-    ptr->write( res );
-    ptr->write( std::string("]"), -10 );
-    ptr->write( std::string("["),  10 );
+    ptr->get_io_service( ).post( boost::bind( write, ptr, res ) );
+    ptr->get_io_service( ).post( boost::bind( write, ptr, res ) );
 
 }
 
@@ -105,6 +112,12 @@ ba::ip::tcp::endpoint make_endpoint( const std::string &address,
     return ba::ip::tcp::endpoint(ba::ip::address::from_string(address), port);
 }
 
+void run_ios( ba::io_service &ios )
+{
+    while( 1 ) {
+        ios.run( );
+    }
+}
 
 int main( ) try
 {
@@ -115,6 +128,11 @@ int main( ) try
     ba::ip::tcp::acceptor acceptor( ios, make_endpoint("127.0.0.1", 55555) );
 
     start_accept( acceptor );
+
+//    boost::thread t1( run_ios, boost::ref( ios ) );
+//    boost::thread t2( run_ios, boost::ref( ios ) );
+//    boost::thread t3( run_ios, boost::ref( ios ) );
+//    boost::thread t4( run_ios, boost::ref( ios ) );
 
     while( 1 ) {
         ios.run( );
