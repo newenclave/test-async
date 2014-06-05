@@ -62,7 +62,8 @@ void on_client_read( stream_sptr ptr, const char *data, size_t lenght )
     std::reverse( res.begin( ), res.end( ) );
 
     ptr->write( res );
-    ptr->write( std::string("->>"), 10 );
+    ptr->write( std::string("]"), -10 );
+    ptr->write( std::string("["),  10 );
 
 }
 
