@@ -268,6 +268,18 @@ namespace async_transport {
         typedef boost::weak_ptr<this_type>   weak_type;
         typedef typename impl::priority_type priority_type;
 
+        struct observer {
+            virtual ~observer( ) { }
+        };
+
+        struct error_observer: public observer {
+            virtual void notify( const boost::system::error_code &error ) = 0;
+        };
+
+        struct read_observer: public observer {
+            virtual void notify( const char *data, size_t length ) = 0;
+        };
+
     private:
 
         boost::shared_ptr<impl> impl_;
