@@ -161,8 +161,9 @@ namespace async_transport {
                                 boost::asio::placeholders::error,
                                 boost::asio::placeholders::bytes_transferred,
                                 length, total,
-                                this->shared_from_this( )))
-                            );
+                                this->shared_from_this( ))
+                            )
+                        );
                 } catch( const std::exception & ) {
                     ;;; /// generate error
                 }
@@ -180,6 +181,13 @@ namespace async_transport {
                 top_message.assign( transformer_->transform( top_message ) );
 
                 async_write( top_message.c_str( ), top_message.size( ), 0);
+            }
+
+            void async_write_impl(  )
+            {
+                if( !queue_empty( ) ) {
+                    async_write(  );
+                }
             }
 
             void write_handler( const boost::system::error_code &error,
@@ -201,6 +209,11 @@ namespace async_transport {
                                     top_mess.size( )  - total, total);
 
                     } else {
+
+//                        write_dispatcher_.post(
+//                                    boost::bind(&impl::async_write_impl,
+//                                                this->shared_from_this( ))
+//                                    );
 
                         if( !queue_empty( ) ) {
                             async_write(  );
