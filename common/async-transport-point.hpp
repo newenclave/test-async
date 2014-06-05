@@ -36,23 +36,38 @@ namespace async_transport {
 
             typedef boost::shared_ptr<queue_container> shared_type;
 
+            int          priority_;
             messate_type message_;
 
-            queue_container( const char *data, size_t length )
-                :message_(data, length)
+            queue_container( char prio, const char *data, size_t length )
+                :priority_(prio)
+                ,message_(data, length)
             { }
 
             static shared_type create( const char *data, size_t length )
             {
-                return boost::make_shared<queue_container>( data, length );
+                return boost::make_shared<queue_container>( 0, data, length );
             }
         };
 
         typedef typename queue_container::shared_type  queue_container_sptr;
         typedef boost::shared_ptr<message_transformer> transformer_sptr;
 
+        struct queue_container_less: std::binary_function<queue_container_sptr,
+                                                          queue_container_sptr,
+                                                          bool >
+        {
+            bool operator ( ) ( const queue_container_sptr &l,
+                                const queue_container_sptr &r ) const
+            {
+                return l->priority_ < r->priority_;
+            }
+        };
 
-        typedef std::queue<queue_container_sptr> message_queue_type;
+        //typedef std::deque<queue_container_sptr> queue_container_type;
+        typedef std::priority_queue<queue_container_sptr,
+                                    std::vector<queue_container_sptr>,
+                                    queue_container_less> message_queue_type;
 
         struct impl: public boost::enable_shared_from_this<impl> {
 
@@ -66,6 +81,7 @@ namespace async_transport {
             stream_type                       stream_;
 
             message_queue_type                write_queue_;
+            queue_container_sptr              current_message_;
 
             std::vector<char>                 read_buffer_;
             read_impl                         read_impl_;
@@ -121,7 +137,7 @@ namespace async_transport {
 
             const queue_container_sptr &queue_top( )
             {
-                return write_queue_.front( );
+                return write_queue_.top( );
             }
 
             void queue_pop( )
@@ -154,8 +170,12 @@ namespace async_transport {
 
             void async_write(  )
             {
+                current_message_ = queue_top( );
+                queue_pop( );
 
-                std::string &top_message( queue_top( )->message_ );
+                std::cout << "pop " << current_message_->priority_ <<  "\n";
+
+                std::string &top_message( current_message_->message_ );
 
                 top_message.assign( transformer_->transform( top_message ) );
 
@@ -168,7 +188,7 @@ namespace async_transport {
                                 size_t       total,
                                 shared_type  /*this_inst*/)
             {
-                queue_container &top( *queue_top( ) );
+                queue_container &top( *current_message_ );
 
                 if( !error ) {
 
@@ -181,8 +201,6 @@ namespace async_transport {
                                     top_mess.size( )  - total, total);
 
                     } else {
-
-                        queue_pop( );
 
                         if( !queue_empty( ) ) {
                             async_write(  );
@@ -202,6 +220,7 @@ namespace async_transport {
                 bool empty = queue_empty( );
 
                 queue_push( data );
+                std::cout << "push " << data->priority_ <<  "\n";
 
                 if( empty ) {
                     async_write(  );
@@ -211,6 +230,7 @@ namespace async_transport {
             void write( const char *data, size_t len, priority_type priority )
             {
                 queue_container_sptr inst(queue_container::create( data, len ));
+                inst->priority_ = priority;
 
                 write_dispatcher_.post(
                         boost::bind( &impl::write_impl, this,
