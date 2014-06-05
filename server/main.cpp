@@ -45,7 +45,7 @@ void accept_handle( boost::system::error_code const &err,
 
 void start_accept( ba::ip::tcp::acceptor &accept )
 {
-    stream_sptr new_point = async_point_type::create( accept.get_io_service( ));
+    stream_sptr new_point(new async_point_type(accept.get_io_service( )));
     accept.async_accept(
                 new_point->stream( ),
                 boost::bind( accept_handle, ba::placeholders::error,
