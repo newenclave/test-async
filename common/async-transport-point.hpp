@@ -18,7 +18,6 @@ namespace async_transport {
         virtual std::string transform( std::string &data ) = 0;
     };
 
-
     struct write_transformer_none: public message_transformer {
         std::string transform( std::string &data )
         {
@@ -34,11 +33,21 @@ namespace async_transport {
         typedef std::string messate_type;
 
         struct queue_container {
+
+            typedef boost::shared_ptr<queue_container> shared_type;
+
             char         priority_;
             messate_type message_;
-            queue_container( )
-                :priority_(0)
+
+            queue_container( char prio, const char *data, size_t length )
+                :priority_(prio)
+                ,message_(data, length)
             { }
+
+            static shared_type create( const char *data, size_t length )
+            {
+                return boost::make_shared<queue_container>( 0, data, length );
+            }
         };
 
         typedef boost::shared_ptr<queue_container> queue_container_sptr;
@@ -79,12 +88,12 @@ namespace async_transport {
                 transformer_ = transform;
             }
 
-            void set_transformer( transformer_sptr trans)
+            void set_transformer( transformer_sptr transform )
             {
                 write_dispatcher_.post(
                             boost::bind( &impl::set_transformer_impl,
                                          this->shared_from_this( ),
-                                         trans ));
+                                         transform ));
             }
 
             void close_impl(  )
@@ -123,7 +132,7 @@ namespace async_transport {
             void async_write(  )
             {
                 std::string &top(write_queue_.front( )->message_);
-                top.assign(transformer_->transform( top ) );
+                top.assign( transformer_->transform( top ) );
 
                 async_write( write_queue_.front( )->message_.c_str( ),
                              write_queue_.front( )->message_.size( ), 0);
@@ -213,11 +222,9 @@ namespace async_transport {
                 (this->*read_impl_)( );
             }
 
-            void write( const char *data, size_t length )
+            void write( const char *data, size_t len )
             {
-                queue_container_sptr inst(
-                                    boost::make_shared<queue_container>( ));
-                inst->message_.assign( data, length );
+                queue_container_sptr inst(queue_container::create( data, len ));
                 write_dispatcher_.post(
                         boost::bind( &impl::write_impl, this,
                                      0, inst, this->shared_from_this( ) ) );
