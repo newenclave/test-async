@@ -119,6 +119,16 @@ void run_ios( ba::io_service &ios )
     }
 }
 
+class observer_connection {
+public:
+    virtual ~observer_connection( ) { }
+    virtual void disconnect( ) { }
+};
+
+class observer {
+    virtual ~observer( ) { }
+};
+
 int main( ) try
 {
 
