@@ -177,7 +177,7 @@ namespace async_transport {
 
         void async_write_no_transform(  )
         {
-            std::string &top( queue_top( )->message_ );
+            const std::string &top( queue_top( )->message_ );
             async_write( top.c_str( ), top.size( ), 0);
         }
 
