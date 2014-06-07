@@ -134,7 +134,8 @@ namespace async_transport {
                         )
                     );
             } catch( const std::exception & ) {
-                ;;; /// generate error
+                /// generate error
+                on_write_exception(  );
             }
         }
 
@@ -254,6 +255,11 @@ namespace async_transport {
 
         virtual void on_write_error( const boost::system::error_code &code )
         { }
+
+        virtual void on_write_exception(  )
+        {
+            throw;
+        }
 
         virtual std::string on_transform_message( std::string &message )
         {

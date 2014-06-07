@@ -107,12 +107,12 @@ void start_accept( ba::ip::tcp::acceptor &accept );
 class my_transformer: public message_transformer
 {
     const  std::string key_;
-    size_t counter;
+    size_t counter_;
 
 public:
     my_transformer( const std::string &key )
         :key_(key)
-        ,counter(0)
+        ,counter_(0)
     { }
 
 private:
@@ -120,9 +120,9 @@ private:
     {
         std::cout << "tramsform " << data.size( ) << " bytes of data\n";
         for( size_t i=0; i<data.size( ); ++i ) {
-            ++counter;
-            counter %= key_.size( );
-            data[i] ^= key_[ counter ];
+            ++counter_;
+            counter_ %= key_.size( );
+            data[i] ^= key_[ counter_ ];
         }
         return data;
     }
