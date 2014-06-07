@@ -261,6 +261,7 @@ namespace async_transport {
 
         void start_read_impl_wrap(  )
         {
+            /// use strand::wrap for callback
             stream_.async_read_some(
                     boost::asio::buffer(&read_buffer_[0], read_buffer_.size( )),
                     write_dispatcher_.wrap(
@@ -275,12 +276,12 @@ namespace async_transport {
         void start_read_impl(  )
         {
             stream_.async_read_some(
-                boost::asio::buffer(&read_buffer_[0], read_buffer_.size( )),
-                        boost::bind( &this_type::read_handler, this,
-                            boost::asio::placeholders::error,
-                            boost::asio::placeholders::bytes_transferred,
-                            this->shared_from_this( )
-                        )
+                    boost::asio::buffer(&read_buffer_[0], read_buffer_.size( )),
+                    boost::bind( &this_type::read_handler, this,
+                        boost::asio::placeholders::error,
+                        boost::asio::placeholders::bytes_transferred,
+                        this->shared_from_this( )
+                    )
                 );
         }
 
