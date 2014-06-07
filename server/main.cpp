@@ -168,9 +168,8 @@ void accept_handle( boost::system::error_code const &err,
 
         stream->on_read_connect( boost::bind( on_client_read, stream, _1, _2 ));
         stream->on_read_error_connect( boost::bind( on_error, stream, _1 ));
-        stream->start_read( );
-
         stream->set_transformer( new my_transformer( "123789" ) );
+        stream->start_read( );
 
         g_read_signal.connect(
             read_signal_type::slot_type(

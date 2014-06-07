@@ -115,7 +115,7 @@ namespace async_transport {
             }
         }
 
-        void push_close(  )
+        void post_close(  )
         {
             write_dispatcher_.post(
                         boost::bind( &this_type::close_impl,
@@ -228,7 +228,7 @@ namespace async_transport {
             }
         }
 
-        void push_write( const char *data, size_t len )
+        void post_write( const char *data, size_t len )
         {
             queue_value_sptr inst(queue_value::create( data, len ));
 
@@ -343,7 +343,7 @@ namespace async_transport {
 
         void write( const char *data, size_t length )
         {
-            push_write( data, length );
+            post_write( data, length );
         }
 
         void start_read( )
@@ -353,7 +353,7 @@ namespace async_transport {
 
         void close( )
         {
-            push_close( );
+            post_close( );
         }
 
     };
