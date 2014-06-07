@@ -53,6 +53,7 @@ public:
         push_set_transformer( transformer_sptr(new_trans) );
     }
 
+
 private:
 
     void push_set_transformer( transformer_sptr transform )
@@ -102,6 +103,13 @@ typedef boost::shared_ptr<my_async_reader> stream_sptr;
 
 std::set<stream_sptr> connections;
 
+typedef boost::signals2::signal_type <
+            void ( stream_sptr, const char *, size_t ),
+            boost::signals2::keywords::mutex_type<boost::mutex>
+        >::type read_signal_type;
+
+read_signal_type g_read_signal;
+
 void start_accept( ba::ip::tcp::acceptor &accept );
 
 class my_transformer: public message_transformer
@@ -140,25 +148,10 @@ void on_error( stream_sptr ptr, const boost::system::error_code &err )
     std::cout << "clients: " << connections.size( ) << "\n";
 }
 
-void write( stream_sptr ptr, std::string res )
-{
-    ptr->write( res );
-}
 
 void on_client_read( stream_sptr ptr, const char *data, size_t length )
 {
-    std::cout << "Read " << length << " bytes from "
-              << ptr->get_stream( ).remote_endpoint( ) << "\n";
-
-    std::string res( data, data + length );
-    std::reverse( res.begin( ), res.end( ) );
-
-    for( std::set<stream_sptr>::iterator b(connections.begin( )),
-                                         e(connections.end( )); b!=e; ++b )
-    {
-        (*b)->write( data, length );
-    }
-
+    g_read_signal( ptr, data, length );
 }
 
 void accept_handle( boost::system::error_code const &err,
@@ -174,6 +167,12 @@ void accept_handle( boost::system::error_code const &err,
         stream->start_read( );
 
         stream->set_transformer( new my_transformer( "123789" ) );
+
+        g_read_signal.connect(
+            read_signal_type::slot_type(
+                boost::bind(
+                    &my_async_reader::write, stream.get( ), _2, _3 )
+                ).track( stream ) );
 
         start_accept( accept );
         std::cout << "new point accepted: "
@@ -205,16 +204,6 @@ void run_ios( ba::io_service &ios )
         ios.run( );
     }
 }
-
-class observer_connection {
-public:
-    virtual ~observer_connection( ) { }
-    virtual void disconnect( ) { }
-};
-
-class observer {
-    virtual ~observer( ) { }
-};
 
 int main( ) try
 {
