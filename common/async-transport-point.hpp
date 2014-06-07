@@ -77,16 +77,16 @@ namespace async_transport {
         call_impl get_read_dispatch( read_dispacth_type dispatch )
         {
             return ( dispatch == DISPATCH_READ )
-                    ? &this_type::start_read_impl_wrap
-                    : &this_type::start_read_impl;
+                   ? &this_type::start_read_impl_wrap
+                   : &this_type::start_read_impl;
         }
 
         static
         call_impl get_message_transform( message_transform_type transform )
         {
             return ( transform == TRANSFORM_MESSAGE )
-                    ? &this_type::async_write_transform
-                    : &this_type::async_write_no_transform;
+                   ? &this_type::async_write_transform
+                   : &this_type::async_write_no_transform;
         }
 
     protected:
