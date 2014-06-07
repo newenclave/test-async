@@ -13,7 +13,50 @@ namespace ba = boost::asio;
 typedef ba::ip::tcp::socket stream_type;
 
 typedef async_transport::point_iface<stream_type> async_point_type;
-typedef async_point_type::shared_type stream_sptr;
+
+class my_async_reader: public async_point_type {
+
+protected:
+
+    my_async_reader( ba::io_service &ios )
+        :async_point_type(ios, 4096)
+    { }
+
+public:
+
+    static
+    boost::shared_ptr<my_async_reader> create( ba::io_service &ios )
+    {
+        return  boost::shared_ptr<my_async_reader>( new my_async_reader(ios) );
+    }
+
+private:
+    VTRC_DECLARE_SIGNAL( on_read, void ( const char *, size_t ) );
+
+    VTRC_DECLARE_SIGNAL( on_read_error,
+                         void ( const boost::system::error_code & ) );
+
+    VTRC_DECLARE_SIGNAL( on_write_error,
+                         void ( const boost::system::error_code & ) );
+
+    void on_read( const char *data, size_t length )
+    {
+        on_read_( data, length );
+    }
+
+    void on_read_error( const boost::system::error_code &code )
+    {
+        on_read_error( code );
+    }
+
+    virtual void on_write_error( const boost::system::error_code &code )
+    {
+        on_write_error( code );
+    }
+
+};
+
+typedef boost::shared_ptr<my_async_reader> stream_sptr;
 
 std::set<stream_sptr> connections;
 
@@ -99,7 +142,7 @@ void accept_handle( boost::system::error_code const &err,
 
 void start_accept( ba::ip::tcp::acceptor &accept )
 {
-    stream_sptr new_point(async_point_type::create(accept.get_io_service( )));
+    stream_sptr new_point(my_async_reader::create(accept.get_io_service( )));
     accept.async_accept(
                 new_point->stream( ),
                 boost::bind( accept_handle, ba::placeholders::error,

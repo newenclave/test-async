@@ -77,7 +77,6 @@ namespace async_transport {
 
         transformer_sptr                  transformer_;
 
-
     protected:
 
         point_iface( boost::asio::io_service &ios, size_t read_block_size )
@@ -197,15 +196,14 @@ namespace async_transport {
                 }
             } else {
                 /// generate error
-                on_write_error_( error );
+                on_write_error( error );
             }
 
         }
 
-        void write_impl( const queue_container_sptr data,
-                         shared_type /*inst*/ )
+        void write_impl( const queue_container_sptr data, shared_type /*inst*/ )
         {
-            bool empty = queue_empty( );
+            const bool empty = queue_empty( );
 
             queue_push( data );
 
@@ -229,11 +227,11 @@ namespace async_transport {
                            size_t const bytes, shared_type /*inst*/ )
         {
             if( !error ) {
-                on_read_( &read_buffer_[0], bytes );
+                on_read( &read_buffer_[0], bytes );
                 push_start_read( );
             } else {
                 /// genegate error;
-                on_read_error_( error );
+                on_read_error( error );
             }
         }
 
@@ -269,13 +267,13 @@ namespace async_transport {
 
     private:
 
-        VTRC_DECLARE_SIGNAL( on_read, void ( const char *, size_t ) );
+        virtual void on_read( const char *data, size_t length ) = 0;
 
-        VTRC_DECLARE_SIGNAL( on_read_error,
-                             void ( const boost::system::error_code & ) );
+        virtual void on_read_error( const boost::system::error_code &code )
+        { }
 
-        VTRC_DECLARE_SIGNAL( on_write_error,
-                             void ( const boost::system::error_code & ) );
+        virtual void on_write_error( const boost::system::error_code &code )
+        { }
 
     public:
 
