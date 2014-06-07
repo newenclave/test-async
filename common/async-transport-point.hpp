@@ -14,17 +14,6 @@
 
 namespace async_transport {
 
-    struct message_transformer {
-        virtual std::string transform( std::string &data ) = 0;
-    };
-
-    struct write_transformer_none: public message_transformer {
-        std::string transform( std::string &data )
-        {
-            return data;
-        }
-    };
-
     template <typename ST>
     class point_iface: public boost::enable_shared_from_this<point_iface<ST> > {
 
@@ -57,7 +46,6 @@ namespace async_transport {
         };
 
         typedef typename queue_container::shared_type  queue_container_sptr;
-        typedef boost::shared_ptr<message_transformer> transformer_sptr;
 
         typedef std::queue<queue_container_sptr> message_queue_type;
 
@@ -75,34 +63,28 @@ namespace async_transport {
 
         bool                              active_;
 
-        transformer_sptr                  transformer_;
+        static
+        read_impl get_dispatch( bool dispatch )
+        {
+            return dispatch
+                    ? &this_type::start_read_impl_wrap
+                    : &this_type::start_read_impl;
+        }
 
     protected:
 
-        point_iface( boost::asio::io_service &ios, size_t read_block_size )
+        point_iface( boost::asio::io_service &ios,
+                     size_t read_block_size = 4096,
+                     bool dispatch_read = false)
             :ios_(ios)
             ,write_dispatcher_(ios_)
             ,stream_(ios_)
             ,read_buffer_(read_block_size)
-            ,read_impl_(&this_type::start_read_impl)
+            ,read_impl_(get_dispatch(dispatch_read))
             ,active_(true)
-            ,transformer_(new write_transformer_none)
         { }
 
     private:
-
-        void set_transformer_impl( transformer_sptr transform )
-        {
-            transformer_ = transform;
-        }
-
-        void push_set_transformer( transformer_sptr transform )
-        {
-            write_dispatcher_.post(
-                        boost::bind( &this_type::set_transformer_impl,
-                                     this->shared_from_this( ),
-                                     transform ));
-        }
 
         void close_impl(  )
         {
@@ -162,7 +144,7 @@ namespace async_transport {
         {
             std::string &top( queue_top( )->message_ );
 
-            top.assign( transformer_->transform( top ) );
+            top.assign( on_transform_message( top ) );
 
             async_write( top.c_str( ), top.size( ), 0);
         }
@@ -275,22 +257,14 @@ namespace async_transport {
         virtual void on_write_error( const boost::system::error_code &code )
         { }
 
+        virtual std::string on_transform_message( std::string &message )
+        {
+            return message;
+        }
+
     public:
 
         virtual ~point_iface( ) { }
-
-        static
-        shared_type create( boost::asio::io_service &ios, size_t block_size )
-        {
-            shared_type inst( new this_type( ios, block_size ) );
-            return inst;
-        }
-
-        static
-        shared_type create( boost::asio::io_service &ios )
-        {
-            return create( ios, 4096 );
-        }
 
         boost::asio::io_service &get_io_service( )
         {
@@ -302,12 +276,22 @@ namespace async_transport {
             return ios_;
         }
 
-        stream_type &stream( )
+        const boost::asio::io_service::strand &get_dispatcher( ) const
+        {
+            return write_dispatcher_;
+        }
+
+        boost::asio::io_service::strand &get_dispatcher( )
+        {
+            return write_dispatcher_;
+        }
+
+        stream_type &get_stream( )
         {
             return stream_;
         }
 
-        const stream_type &stream( ) const
+        const stream_type &get_stream( ) const
         {
             return stream_;
         }
@@ -330,11 +314,6 @@ namespace async_transport {
         void close( )
         {
             push_close( );
-        }
-
-        void set_transformer( message_transformer *new_trans )
-        {
-            push_set_transformer( transformer_sptr(new_trans) );
         }
 
     };
