@@ -37,25 +37,25 @@ namespace async_transport {
 
         typedef std::string messate_type;
 
-        struct queue_container {
+        struct queue_value {
 
-            typedef boost::shared_ptr<queue_container> shared_type;
+            typedef boost::shared_ptr<queue_value> shared_type;
 
             messate_type message_;
 
-            queue_container( const char *data, size_t length )
+            queue_value( const char *data, size_t length )
                 :message_(data, length)
             { }
 
             static shared_type create( const char *data, size_t length )
             {
-                return boost::make_shared<queue_container>( data, length );
+                return boost::make_shared<queue_value>( data, length );
             }
         };
 
-        typedef typename queue_container::shared_type  queue_container_sptr;
+        typedef typename queue_value::shared_type  queue_value_sptr;
 
-        typedef std::queue<queue_container_sptr> message_queue_type;
+        typedef std::queue<queue_value_sptr> message_queue_type;
 
         typedef void (this_type::*call_impl)( );
         typedef int  priority_type;
@@ -120,12 +120,12 @@ namespace async_transport {
                                      this->shared_from_this( ) ));
         }
 
-        void queue_push( const queue_container_sptr &new_mess )
+        void queue_push( const queue_value_sptr &new_mess )
         {
             write_queue_.push( new_mess );
         }
 
-        const queue_container_sptr &queue_top( )
+        const queue_value_sptr &queue_top( )
         {
             return write_queue_.front( );
         }
@@ -186,7 +186,7 @@ namespace async_transport {
                             size_t       total,
                             shared_type  /*this_inst*/)
         {
-            queue_container &top( *queue_top( ) );
+            queue_value &top( *queue_top( ) );
 
             if( !error ) {
 
@@ -214,7 +214,7 @@ namespace async_transport {
 
         }
 
-        void write_impl( const queue_container_sptr data, shared_type /*inst*/ )
+        void write_impl( const queue_value_sptr data, shared_type /*inst*/ )
         {
             const bool empty = queue_empty( );
 
@@ -227,7 +227,7 @@ namespace async_transport {
 
         void push_write( const char *data, size_t len )
         {
-            queue_container_sptr inst(queue_container::create( data, len ));
+            queue_value_sptr inst(queue_value::create( data, len ));
 
             write_dispatcher_.post(
                     boost::bind( &this_type::write_impl, this,

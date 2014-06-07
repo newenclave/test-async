@@ -174,9 +174,9 @@ void accept_handle( boost::system::error_code const &err,
 
         g_read_signal.connect(
             read_signal_type::slot_type(
-                boost::bind(
-                    &my_async_reader::write, stream.get( ), _2, _3 )
-                ).track( stream ) );
+                    boost::bind( &my_async_reader::write, stream, _2, _3 )
+            ).track( stream )
+        );
 
         start_accept( accept );
         std::cout << "new point accepted: "
