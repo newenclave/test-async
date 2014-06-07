@@ -122,6 +122,8 @@ namespace async_transport {
                                      this->shared_from_this( ) ));
         }
 
+        /// =========== queue wrap calls =========== ///
+
         void queue_push( const queue_value_sptr &new_mess )
         {
             write_queue_.push( new_mess );

@@ -38,7 +38,7 @@ protected:
     my_async_reader( ba::io_service &ios )
         :async_point_type(ios, 4096,
                           async_point_type::DONT_DISPATCH_READ,
-                          async_point_type::TRANSFORM_MESSAGE)
+                          async_point_type::DONT_TRANSFORM_MESSAGE)
         ,transformer_(new write_transformer_none)
     { }
 
