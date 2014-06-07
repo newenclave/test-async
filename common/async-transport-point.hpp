@@ -23,6 +23,16 @@ namespace async_transport {
         typedef boost::weak_ptr<this_type>   weak_type;
         typedef ST stream_type;
 
+        enum message_transform_type {
+            DONT_TRANSFORM_MESSAGE,
+            TRANSFORM_MESSAGE
+        };
+
+        enum read_dispacth_type {
+            DONT_DISPATCH_READ,
+            DISPATCH_READ
+        };
+
     private:
 
         typedef std::string messate_type;
@@ -47,7 +57,7 @@ namespace async_transport {
 
         typedef std::queue<queue_container_sptr> message_queue_type;
 
-        typedef void (this_type::*read_impl)( );
+        typedef void (this_type::*call_impl)( );
         typedef int  priority_type;
 
         boost::asio::io_service          &ios_;
@@ -57,28 +67,39 @@ namespace async_transport {
         message_queue_type                write_queue_;
 
         std::vector<char>                 read_buffer_;
-        read_impl                         read_impl_;
+        call_impl                         read_impl_;
+        call_impl                         async_write_impl_;
 
         bool                              active_;
 
         static
-        read_impl get_dispatch( bool dispatch )
+        call_impl get_read_dispatch( read_dispacth_type dispatch )
         {
-            return dispatch
+            return ( dispatch == DISPATCH_READ )
                     ? &this_type::start_read_impl_wrap
                     : &this_type::start_read_impl;
+        }
+
+        static
+        call_impl get_message_transform( message_transform_type transform )
+        {
+            return ( transform == TRANSFORM_MESSAGE )
+                    ? &this_type::async_write_transform
+                    : &this_type::async_write_no_transform;
         }
 
     protected:
 
         point_iface( boost::asio::io_service &ios,
-                     size_t read_block_size = 4096,
-                     bool dispatch_read = false)
+                     size_t read_block_size,
+                     read_dispacth_type dispatch_read,
+                     message_transform_type transform_message )
             :ios_(ios)
             ,write_dispatcher_(ios_)
             ,stream_(ios_)
             ,read_buffer_(read_block_size)
-            ,read_impl_(get_dispatch(dispatch_read))
+            ,read_impl_(get_read_dispatch(dispatch_read))
+            ,async_write_impl_(get_message_transform(transform_message))
             ,active_(true)
         { }
 
@@ -139,12 +160,23 @@ namespace async_transport {
             }
         }
 
-        void async_write(  )
+        void async_write( )
+        {
+            (this->*async_write_impl_)( );
+        }
+
+        void async_write_transform(  )
         {
             std::string &top( queue_top( )->message_ );
 
             top.assign( on_transform_message( top ) );
 
+            async_write( top.c_str( ), top.size( ), 0);
+        }
+
+        void async_write_no_transform(  )
+        {
+            std::string &top( queue_top( )->message_ );
             async_write( top.c_str( ), top.size( ), 0);
         }
 

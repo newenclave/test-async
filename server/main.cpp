@@ -36,7 +36,9 @@ class my_async_reader: public async_point_type {
 protected:
 
     my_async_reader( ba::io_service &ios )
-        :async_point_type(ios, 4096)
+        :async_point_type(ios, 4096,
+                          async_point_type::DONT_DISPATCH_READ,
+                          async_point_type::TRANSFORM_MESSAGE)
         ,transformer_(new write_transformer_none)
     { }
 
@@ -52,7 +54,6 @@ public:
     {
         push_set_transformer( transformer_sptr(new_trans) );
     }
-
 
 private:
 
@@ -118,6 +119,7 @@ class my_transformer: public message_transformer
     size_t counter_;
 
 public:
+
     my_transformer( const std::string &key )
         :key_(key)
         ,counter_(0)
@@ -126,7 +128,6 @@ public:
 private:
     std::string transform( std::string &data )
     {
-        std::cout << "tramsform " << data.size( ) << " bytes of data\n";
         for( size_t i=0; i<data.size( ); ++i ) {
             ++counter_;
             counter_ %= key_.size( );
@@ -151,6 +152,9 @@ void on_error( stream_sptr ptr, const boost::system::error_code &err )
 
 void on_client_read( stream_sptr ptr, const char *data, size_t length )
 {
+    std::cout << "got " << length << " bytes from "
+              << ptr->get_stream( ).remote_endpoint( )
+              << "\n";
     g_read_signal( ptr, data, length );
 }
 
