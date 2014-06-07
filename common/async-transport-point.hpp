@@ -26,9 +26,17 @@ namespace async_transport {
     };
 
     template <typename ST>
-    class point_iface {
+    class point_iface: public boost::enable_shared_from_this<point_iface<ST> > {
 
         typedef point_iface<ST> this_type;
+
+    public:
+
+        typedef boost::shared_ptr<this_type> shared_type;
+        typedef boost::weak_ptr<this_type>   weak_type;
+        typedef ST stream_type;
+
+    private:
 
         typedef std::string messate_type;
 
@@ -53,238 +61,213 @@ namespace async_transport {
 
         typedef std::queue<queue_container_sptr> message_queue_type;
 
-        struct impl: public boost::enable_shared_from_this<impl> {
+        typedef void (this_type::*read_impl)( );
+        typedef int  priority_type;
 
-            typedef ST stream_type;
-            typedef boost::shared_ptr<impl> shared_type;
-            typedef void (impl::*read_impl)( );
-            typedef int  priority_type;
+        boost::asio::io_service          &ios_;
+        boost::asio::io_service::strand   write_dispatcher_;
+        stream_type                       stream_;
 
-            boost::asio::io_service          &ios_;
-            boost::asio::io_service::strand   write_dispatcher_;
-            stream_type                       stream_;
+        message_queue_type                write_queue_;
 
-            message_queue_type                write_queue_;
+        std::vector<char>                 read_buffer_;
+        read_impl                         read_impl_;
 
-            std::vector<char>                 read_buffer_;
-            read_impl                         read_impl_;
+        bool                              active_;
 
-            point_iface<stream_type>         *parent_;
+        transformer_sptr                  transformer_;
 
-            bool                              active_;
 
-            transformer_sptr                  transformer_;
+    protected:
 
-            impl( boost::asio::io_service &ios, size_t read_block_size )
-                :ios_(ios)
-                ,write_dispatcher_(ios_)
-                ,stream_(ios_)
-                ,read_buffer_(read_block_size)
-                ,read_impl_(&impl::start_read_impl)
-                ,active_(true)
-                ,transformer_(new write_transformer_none)
-            { }
-
-            void set_transformer_impl( transformer_sptr transform )
-            {
-                transformer_ = transform;
-            }
-
-            void set_transformer( transformer_sptr transform )
-            {
-                write_dispatcher_.post(
-                            boost::bind( &impl::set_transformer_impl,
-                                         this->shared_from_this( ),
-                                         transform ));
-            }
-
-            void close_impl(  )
-            {
-                if( active_ ) {
-                    active_ = false;
-                    stream_.close( );
-                }
-            }
-
-            void close(  )
-            {
-                write_dispatcher_.post(
-                            boost::bind( &impl::close_impl,
-                                         this->shared_from_this( ) ));
-            }
-
-            void queue_push( const queue_container_sptr &new_mess )
-            {
-                write_queue_.push( new_mess );
-            }
-
-            const queue_container_sptr &queue_top( )
-            {
-                return write_queue_.front( );
-            }
-
-            void queue_pop( )
-            {
-                write_queue_.pop( );
-            }
-
-            bool queue_empty( ) const
-            {
-                return write_queue_.empty( );
-            }
-
-            /// ================ write ================ ///
-            void async_write( const char *data, size_t length, size_t total )
-            {
-                try {
-                    stream_.async_write_some(
-                        boost::asio::buffer( data, length ),
-                            write_dispatcher_.wrap(
-                                boost::bind( &impl::write_handler, this,
-                                boost::asio::placeholders::error,
-                                boost::asio::placeholders::bytes_transferred,
-                                length, total,
-                                this->shared_from_this( ))
-                            )
-                        );
-                } catch( const std::exception & ) {
-                    ;;; /// generate error
-                }
-            }
-
-            void async_write(  )
-            {
-                std::string &top( queue_top( )->message_ );
-
-                top.assign( transformer_->transform( top ) );
-
-                async_write( top.c_str( ), top.size( ), 0);
-            }
-
-            void write_handler( const boost::system::error_code &error,
-                                size_t const bytes,
-                                size_t const length,
-                                size_t       total,
-                                shared_type  /*this_inst*/)
-            {
-                queue_container &top( *queue_top( ) );
-
-                if( !error ) {
-
-                    if( bytes < length ) {
-
-                        total += bytes;
-
-                        const std::string &top_mess( top.message_ );
-                        async_write(top_mess.c_str( ) + total,
-                                    top_mess.size( )  - total, total);
-
-                    } else {
-
-                        queue_pop( );
-
-                        if( !queue_empty( ) ) {
-                            async_write(  );
-                        }
-
-                    }
-                } else {
-                    /// generate error
-                    parent_->on_write_error_( error );
-                }
-
-            }
-
-            void write_impl( const queue_container_sptr data,
-                             shared_type /*inst*/ )
-            {
-                bool empty = queue_empty( );
-
-                queue_push( data );
-
-                if( empty ) {
-                    async_write(  );
-                }
-            }
-
-            void write( const char *data, size_t len )
-            {
-                queue_container_sptr inst(queue_container::create( data, len ));
-
-                write_dispatcher_.post(
-                        boost::bind( &impl::write_impl, this,
-                                     inst, this->shared_from_this( ) )
-                        );
-            }
-
-            /// ================ read ================ ///
-            void read_handler( const boost::system::error_code &error,
-                               size_t const bytes, shared_type /*inst*/ )
-            {
-                if( !error ) {
-                    parent_->on_read_( &read_buffer_[0], bytes );
-                    start_read( );
-                } else {
-                    /// genegate error;
-                    parent_->on_read_error_( error );
-                }
-            }
-
-            void start_read_impl_wrap(  )
-            {
-                stream_.async_read_some(
-                    boost::asio::buffer(&read_buffer_[0], read_buffer_.size( )),
-                        write_dispatcher_.wrap(
-                            boost::bind( &impl::read_handler, this,
-                            boost::asio::placeholders::error,
-                            boost::asio::placeholders::bytes_transferred,
-                            this->shared_from_this( ))
-                        )
-                 );
-            }
-
-            void start_read_impl(  )
-            {
-                stream_.async_read_some(
-                    boost::asio::buffer(&read_buffer_[0], read_buffer_.size( )),
-                            boost::bind( &impl::read_handler, this,
-                                boost::asio::placeholders::error,
-                                boost::asio::placeholders::bytes_transferred,
-                                this->shared_from_this( )
-                            )
-                    );
-            }
-
-            void start_read( )
-            {
-                (this->*read_impl_)( );
-            }
-        };
-
-    public:
-
-        typedef ST stream_type;
-        typedef boost::shared_ptr<this_type> shared_type;
-        typedef boost::weak_ptr<this_type>   weak_type;
-        typedef typename impl::priority_type priority_type;
-
-        struct observer {
-            virtual ~observer( ) { }
-        };
-
-        struct error_observer: public observer {
-            virtual void notify( const boost::system::error_code &error ) = 0;
-        };
-
-        struct read_observer: public observer {
-            virtual void notify( const char *data, size_t length ) = 0;
-        };
+        point_iface( boost::asio::io_service &ios, size_t read_block_size )
+            :ios_(ios)
+            ,write_dispatcher_(ios_)
+            ,stream_(ios_)
+            ,read_buffer_(read_block_size)
+            ,read_impl_(&this_type::start_read_impl)
+            ,active_(true)
+            ,transformer_(new write_transformer_none)
+        { }
 
     private:
 
-        boost::shared_ptr<impl> impl_;
+        void set_transformer_impl( transformer_sptr transform )
+        {
+            transformer_ = transform;
+        }
 
-        friend class impl;
+        void push_set_transformer( transformer_sptr transform )
+        {
+            write_dispatcher_.post(
+                        boost::bind( &this_type::set_transformer_impl,
+                                     this->shared_from_this( ),
+                                     transform ));
+        }
+
+        void close_impl(  )
+        {
+            if( active_ ) {
+                active_ = false;
+                stream_.close( );
+            }
+        }
+
+        void push_close(  )
+        {
+            write_dispatcher_.post(
+                        boost::bind( &this_type::close_impl,
+                                     this->shared_from_this( ) ));
+        }
+
+        void queue_push( const queue_container_sptr &new_mess )
+        {
+            write_queue_.push( new_mess );
+        }
+
+        const queue_container_sptr &queue_top( )
+        {
+            return write_queue_.front( );
+        }
+
+        void queue_pop( )
+        {
+            write_queue_.pop( );
+        }
+
+        bool queue_empty( ) const
+        {
+            return write_queue_.empty( );
+        }
+
+        /// ================ write ================ ///
+        void async_write( const char *data, size_t length, size_t total )
+        {
+            try {
+                stream_.async_write_some(
+                    boost::asio::buffer( data, length ),
+                        write_dispatcher_.wrap(
+                            boost::bind( &this_type::write_handler, this,
+                            boost::asio::placeholders::error,
+                            boost::asio::placeholders::bytes_transferred,
+                            length, total,
+                            this->shared_from_this( ))
+                        )
+                    );
+            } catch( const std::exception & ) {
+                ;;; /// generate error
+            }
+        }
+
+        void async_write(  )
+        {
+            std::string &top( queue_top( )->message_ );
+
+            top.assign( transformer_->transform( top ) );
+
+            async_write( top.c_str( ), top.size( ), 0);
+        }
+
+        void write_handler( const boost::system::error_code &error,
+                            size_t const bytes,
+                            size_t const length,
+                            size_t       total,
+                            shared_type  /*this_inst*/)
+        {
+            queue_container &top( *queue_top( ) );
+
+            if( !error ) {
+
+                if( bytes < length ) {
+
+                    total += bytes;
+
+                    const std::string &top_mess( top.message_ );
+                    async_write(top_mess.c_str( ) + total,
+                                top_mess.size( )  - total, total);
+
+                } else {
+
+                    queue_pop( );
+
+                    if( !queue_empty( ) ) {
+                        async_write(  );
+                    }
+
+                }
+            } else {
+                /// generate error
+                on_write_error_( error );
+            }
+
+        }
+
+        void write_impl( const queue_container_sptr data,
+                         shared_type /*inst*/ )
+        {
+            bool empty = queue_empty( );
+
+            queue_push( data );
+
+            if( empty ) {
+                async_write(  );
+            }
+        }
+
+        void push_write( const char *data, size_t len )
+        {
+            queue_container_sptr inst(queue_container::create( data, len ));
+
+            write_dispatcher_.post(
+                    boost::bind( &this_type::write_impl, this,
+                                 inst, this->shared_from_this( ) )
+                    );
+        }
+
+        /// ================ read ================ ///
+        void read_handler( const boost::system::error_code &error,
+                           size_t const bytes, shared_type /*inst*/ )
+        {
+            if( !error ) {
+                on_read_( &read_buffer_[0], bytes );
+                push_start_read( );
+            } else {
+                /// genegate error;
+                on_read_error_( error );
+            }
+        }
+
+        void start_read_impl_wrap(  )
+        {
+            stream_.async_read_some(
+                    boost::asio::buffer(&read_buffer_[0], read_buffer_.size( )),
+                    write_dispatcher_.wrap(
+                        boost::bind( &this_type::read_handler, this,
+                        boost::asio::placeholders::error,
+                        boost::asio::placeholders::bytes_transferred,
+                        this->shared_from_this( ))
+                    )
+             );
+        }
+
+        void start_read_impl(  )
+        {
+            stream_.async_read_some(
+                boost::asio::buffer(&read_buffer_[0], read_buffer_.size( )),
+                        boost::bind( &this_type::read_handler, this,
+                            boost::asio::placeholders::error,
+                            boost::asio::placeholders::bytes_transferred,
+                            this->shared_from_this( )
+                        )
+                );
+        }
+
+        void push_start_read( )
+        {
+            (this->*read_impl_)( );
+        }
+
+    private:
 
         VTRC_DECLARE_SIGNAL( on_read, void ( const char *, size_t ) );
 
@@ -296,34 +279,39 @@ namespace async_transport {
 
     public:
 
-        point_iface( boost::asio::io_service &ios )
-            :impl_(new impl(ios, 4096))
-        {
-            impl_->parent_ = this;
-        }
-
         virtual ~point_iface( ) { }
 
-    public:
+        static
+        shared_type create( boost::asio::io_service &ios, size_t block_size )
+        {
+            shared_type inst( new this_type( ios, block_size ) );
+            return inst;
+        }
+
+        static
+        shared_type create( boost::asio::io_service &ios )
+        {
+            return create( ios, 4096 );
+        }
 
         boost::asio::io_service &get_io_service( )
         {
-            return impl_->ios_;
+            return ios_;
         }
 
         const boost::asio::io_service &get_io_service( ) const
         {
-            return impl_->ios_;
+            return ios_;
         }
 
         stream_type &stream( )
         {
-            return impl_->stream_;
+            return stream_;
         }
 
         const stream_type &stream( ) const
         {
-            return impl_->stream_;
+            return stream_;
         }
 
         void write( const std::string &data )
@@ -333,22 +321,22 @@ namespace async_transport {
 
         void write( const char *data, size_t length )
         {
-            impl_->write( data, length );
+            push_write( data, length );
         }
 
         void start_read( )
         {
-            impl_->start_read( );
+            push_start_read( );
         }
 
         void close( )
         {
-            impl_->close( );
+            push_close( );
         }
 
         void set_transformer( message_transformer *new_trans )
         {
-            impl_->set_transformer( transformer_sptr(new_trans) );
+            push_set_transformer( transformer_sptr(new_trans) );
         }
 
     };
