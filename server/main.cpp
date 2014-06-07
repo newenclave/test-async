@@ -224,9 +224,7 @@ int main( ) try
 //    boost::thread t3( run_ios, boost::ref( ios ) );
 //    boost::thread t4( run_ios, boost::ref( ios ) );
 
-    while( 1 ) {
-        ios.run( );
-    }
+    run_ios( ios );
 
     return 0;
 
