@@ -2,8 +2,9 @@
 #define ASYNC_TRANSPORT_POINT_HPP
 
 #include "boost/asio.hpp"
-#include "boost/enable_shared_from_this.hpp"
+
 #include "boost/bind.hpp"
+#include "boost/enable_shared_from_this.hpp"
 #include "boost/make_shared.hpp"
 #include "boost/weak_ptr.hpp"
 
