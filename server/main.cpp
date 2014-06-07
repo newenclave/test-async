@@ -7,6 +7,7 @@
 #include "boost/thread.hpp"
 
 #include "common/async-transport-point.hpp"
+#include "vtrc-signal-declaration.h"
 
 namespace ba = boost::asio;
 

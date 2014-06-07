@@ -10,8 +10,6 @@
 #include <string>
 #include <queue>
 
-#include "vtrc-signal-declaration.h"
-
 namespace async_transport {
 
     template <typename ST>
