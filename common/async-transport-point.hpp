@@ -141,6 +141,12 @@ namespace async_transport {
         }
 
         /// ================ write ================ ///
+
+        void async_write( )
+        {
+            (this->*async_write_impl_)( );
+        }
+
         void async_write( const char *data, size_t length, size_t total )
         {
             try {
@@ -158,11 +164,6 @@ namespace async_transport {
                 /// generate error
                 on_write_exception(  );
             }
-        }
-
-        void async_write( )
-        {
-            (this->*async_write_impl_)( );
         }
 
         void async_write_transform(  )
@@ -236,12 +237,18 @@ namespace async_transport {
         }
 
         /// ================ read ================ ///
+
+        void async_read( )
+        {
+            (this->*read_impl_)( );
+        }
+
         void read_handler( const boost::system::error_code &error,
                            size_t const bytes, shared_type /*inst*/ )
         {
             if( !error ) {
                 on_read( &read_buffer_[0], bytes );
-                push_start_read( );
+                async_read( );
             } else {
                 /// genegate error;
                 on_read_error( error );
@@ -271,11 +278,6 @@ namespace async_transport {
                             this->shared_from_this( )
                         )
                 );
-        }
-
-        void push_start_read( )
-        {
-            (this->*read_impl_)( );
         }
 
     private:
@@ -344,7 +346,7 @@ namespace async_transport {
 
         void start_read( )
         {
-            push_start_read( );
+            async_read( );
         }
 
         void close( )
