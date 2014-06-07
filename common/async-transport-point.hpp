@@ -48,7 +48,8 @@ namespace async_transport {
                 :message_(data, length)
             { }
 
-            static shared_type create( const char *data, size_t length )
+            static
+            shared_type create( const char *data, size_t length )
             {
                 return boost::make_shared<queue_value>( data, length );
             }
