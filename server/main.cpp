@@ -131,7 +131,7 @@ private:
         for( size_t i=0; i<data.size( ); ++i ) {
             ++counter_;
             counter_ %= key_.size( );
-            data[i] ^= key_[ counter_ ];
+            data[i]  ^= key_[counter_];
         }
         return data;
     }
@@ -148,7 +148,6 @@ void on_error( stream_sptr ptr, const boost::system::error_code &err )
     connections.erase( ptr );
     std::cout << "clients: " << connections.size( ) << "\n";
 }
-
 
 void on_client_read( stream_sptr ptr, const char *data, size_t length )
 {
@@ -196,7 +195,7 @@ void start_accept( ba::ip::tcp::acceptor &accept )
 }
 
 ba::ip::tcp::endpoint make_endpoint( const std::string &address,
-                                    unsigned short port )
+                                     unsigned short port )
 {
     return ba::ip::tcp::endpoint(ba::ip::address::from_string(address), port);
 }

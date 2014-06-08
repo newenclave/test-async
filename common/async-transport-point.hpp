@@ -107,7 +107,7 @@ namespace async_transport {
 
     private:
 
-        void close_impl(  )
+        void close_impl( shared_type /*inst*/ )
         {
             if( active_ ) {
                 active_ = false;
@@ -118,7 +118,7 @@ namespace async_transport {
         void post_close(  )
         {
             write_dispatcher_.post(
-                        boost::bind( &this_type::close_impl,
+                        boost::bind( &this_type::close_impl, this,
                                      this->shared_from_this( ) ));
         }
 
