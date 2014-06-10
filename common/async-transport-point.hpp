@@ -161,7 +161,7 @@ namespace async_transport {
         {
             try {
                 stream_.async_write_some(
-                    boost::asio::buffer( data, length ),
+                        boost::asio::buffer( data, length ),
                         write_dispatcher_.wrap(
                             boost::bind( &this_type::write_handler, this,
                             boost::asio::placeholders::error,
@@ -169,7 +169,7 @@ namespace async_transport {
                             length, total,
                             this->shared_from_this( ))
                         )
-                    );
+                );
             } catch( const std::exception & ) {
                 /// generate error
                 on_write_exception(  );
