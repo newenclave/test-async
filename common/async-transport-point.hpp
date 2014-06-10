@@ -7,6 +7,7 @@
 #include "boost/enable_shared_from_this.hpp"
 #include "boost/make_shared.hpp"
 #include "boost/weak_ptr.hpp"
+#include "boost/function.hpp"
 
 #include <string>
 #include <queue>
@@ -34,15 +35,20 @@ namespace async_transport {
             DISPATCH_READ
         };
 
+        typedef boost::function <
+            void (const boost::system::error_code &)
+        > write_closure;
+
     private:
 
-        typedef std::string messate_type;
+        typedef std::string message_type;
 
         struct queue_value {
 
             typedef boost::shared_ptr<queue_value> shared_type;
 
-            messate_type message_;
+            message_type    message_;
+            write_closure   success_;
 
             queue_value( const char *data, size_t length )
                 :message_(data, length)
@@ -205,6 +211,10 @@ namespace async_transport {
 
                 } else {
 
+                    if( top.success_ ) {
+                        top.success_( error );
+                    }
+
                     queue_pop( );
 
                     if( !queue_empty( ) ) {
@@ -214,6 +224,9 @@ namespace async_transport {
                 }
             } else {
                 /// generate error
+                if( top.success_ ) {
+                    top.success_( error );
+                }
                 on_write_error( error );
             }
 
@@ -230,9 +243,11 @@ namespace async_transport {
             }
         }
 
-        void post_write( const char *data, size_t len )
+        void post_write( const char *data, size_t len,
+                         const write_closure &close )
         {
             queue_value_sptr inst(queue_value::create( data, len ));
+            inst->success_ = close;
 
             write_dispatcher_.post(
                     boost::bind( &this_type::write_impl, this,
@@ -341,12 +356,24 @@ namespace async_transport {
 
         void write( const std::string &data )
         {
-            write( data.c_str( ), data.size( ) );
+            write2( data.c_str( ), data.size( ), write_closure( ) );
+        }
+
+        void write2( const std::string &data,
+                     const write_closure &closuse )
+        {
+            write2( data.c_str( ), data.size( ), closuse );
         }
 
         void write( const char *data, size_t length )
         {
-            post_write( data, length );
+            post_write( data, length, write_closure( ) );
+        }
+
+        void write2( const char *data, size_t length,
+                    const write_closure &closuse )
+        {
+            post_write( data, length, closuse );
         }
 
         void start_read( )
