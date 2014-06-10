@@ -297,7 +297,7 @@ namespace async_transport {
                         boost::asio::placeholders::bytes_transferred,
                         this->shared_from_this( )
                     )
-                );
+            );
         }
 
     private:
