@@ -356,13 +356,13 @@ namespace async_transport {
 
         void write( const std::string &data )
         {
-            write2( data.c_str( ), data.size( ), write_closure( ) );
+            write_post_notify( data.c_str( ), data.size( ), write_closure( ) );
         }
 
-        void write2( const std::string &data,
-                     const write_closure &closuse )
+        void write_post_notify( const std::string &data,
+                                const write_closure &closuse )
         {
-            write2( data.c_str( ), data.size( ), closuse );
+            write_post_notify( data.c_str( ), data.size( ), closuse );
         }
 
         void write( const char *data, size_t length )
@@ -370,8 +370,8 @@ namespace async_transport {
             post_write( data, length, write_closure( ) );
         }
 
-        void write2( const char *data, size_t length,
-                    const write_closure &closuse )
+        void write_post_notify( const char *data, size_t length,
+                                const write_closure &closuse )
         {
             post_write( data, length, closuse );
         }
