@@ -157,6 +157,17 @@ void on_client_read( stream_sptr ptr, const char *data, size_t length )
     g_read_signal( ptr, data, length );
 }
 
+void post_write_message( const boost::system::error_code &error,
+                         std::string data )
+{
+    if( !error ) {
+        std::cout << "sent: " << data << "; No error\n";
+    } else {
+        std::cout << "sent: " << data
+                  << "; failed: " << error.message( ) << "\n";
+    }
+}
+
 void accept_handle( boost::system::error_code const &err,
                     stream_sptr stream,
                     ba::ip::tcp::acceptor &accept )
