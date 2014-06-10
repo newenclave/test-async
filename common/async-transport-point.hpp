@@ -182,7 +182,7 @@ namespace async_transport {
 
             top.assign( on_transform_message( top ) );
 
-            async_write( top.c_str( ), top.size( ), 0);
+            async_write( top.c_str( ), top.size( ), 0 );
         }
 
         void async_write_no_transform(  )
